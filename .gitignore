@@ -5,7 +5,7 @@ riderModule.iml
 
 
 # IDEA
-.idea/
+.idea/**
 EyeBot.sln.DotSettings.user
 
 # BUILD
