@@ -45,19 +45,21 @@ internal class EyeBot
         }
     }
 
-    private async Task InitCommands()
+    private void InitCommands()
     {
-        await AddCommand(new RoleSelection());
+        AddCommand(new RoleSelection()).Wait();
     }
 
-    private async Task SlashCommandHandler(SocketSlashCommand command)
+    private Task SlashCommandHandler(SocketSlashCommand command)
     {
-        await _commands[command.CommandName].Execute(command.Data);
+        _commands[command.CommandName].Execute(command.Data);
+        return Task.CompletedTask;
     }
 
-    private async Task Ready()
+    private Task Ready()
     {
-        await InitCommands();
+        InitCommands();
+        return Task.CompletedTask;
     }
 
     private Task Log(LogMessage msg)

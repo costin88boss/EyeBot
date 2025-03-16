@@ -1,5 +1,13 @@
-bin/
-obj/
+
 /packages/
 riderModule.iml
 /_ReSharper.Caches/
+
+
+# IDEA
+.idea/
+EyeBot.sln.DotSettings.user
+
+# BUILD
+EyeBot/obj/
+EyeBot/bin/
