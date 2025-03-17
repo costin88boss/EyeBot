@@ -1,6 +1,8 @@
 ﻿using Discord;
+using Discord.Net;
 using Discord.WebSocket;
 using EyeBot.commands;
+using Newtonsoft.Json;
 
 namespace EyeBot;
 
@@ -22,6 +24,8 @@ internal class EyeBot
         _client.Log += Log;
         _client.Ready += Ready;
         _client.SlashCommandExecuted += SlashCommandHandler;
+        _client.SelectMenuExecuted += SelectMenuHandler;
+        _client.ButtonExecuted += ButtonHandler;
 
         await _client.LoginAsync(TokenType.Bot, token);
         await _client.StartAsync();
@@ -43,16 +47,71 @@ internal class EyeBot
             Console.WriteLine("ERROR - Could not add ICommand {0}", command.GetType().Name);
             throw new Exception();
         }
+        catch(HttpException exception)
+        {
+            var json = JsonConvert.SerializeObject(exception.Errors, Formatting.Indented);
+            Console.WriteLine(json);
+        }
     }
 
     private void InitCommands()
     {
         AddCommand(new RoleSelection()).Wait();
+        
     }
 
+    private Task SelectMenuHandler(SocketMessageComponent cmp)
+    {
+        try
+        {
+            foreach (var cmd in _commands.Values)
+            {
+                if (cmd.ComponentHandle(_client, cmp)) break;
+            }
+        }
+        catch (KeyNotFoundException)
+        {
+            // "This interaction failed"
+            // Not very ideal but idc
+            cmp.RespondAsync("", ephemeral: true);
+        }
+
+        return Task.CompletedTask;
+    }
+    
+    private Task ButtonHandler(SocketMessageComponent cmp)
+    {
+        try
+        {
+            foreach (var cmd in _commands.Values)
+            {
+                if (cmd.ComponentHandle(_client, cmp)) break;
+                
+            }
+        }
+        catch (KeyNotFoundException)
+        {
+            // "This interaction failed"
+            // Not very ideal but idc
+            cmp.RespondAsync("", ephemeral: true);
+        }
+
+        return Task.CompletedTask;
+    }
+    
     private Task SlashCommandHandler(SocketSlashCommand command)
     {
-        _commands[command.CommandName].Execute(command.Data);
+        try
+        {
+            _commands[command.CommandName].Execute(_client, command).Wait();
+        }
+        catch (KeyNotFoundException)
+        {
+            // "This interaction failed"
+            // Not very ideal but idc
+            command.RespondAsync("", ephemeral: true);
+        }
+
         return Task.CompletedTask;
     }
 

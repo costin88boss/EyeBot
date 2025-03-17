@@ -7,5 +7,6 @@ public interface ICommand
 {
     public SlashCommandProperties Properties { get; }
 
-    public Task Execute(SocketSlashCommandData data);
+    public Task Execute(DiscordSocketClient client,  SocketSlashCommand cmd);
+    public bool ComponentHandle(DiscordSocketClient client, SocketMessageComponent cmp);
 }
