@@ -12,7 +12,9 @@ internal class EyeBot
 
     private readonly Dictionary<string, ICommand> _commands = new();
 
-    private static void Main(string[] args)
+    private event ButtonHandlerFuncSignature ButtonHandlerEventHandler = delegate { };
+
+    private static void Main()
     {
         var token = Environment.GetEnvironmentVariable("EYEBOT_TOKEN");
         if (token == null) throw new NullReferenceException("EYEBOT_TOKEN environment variable is not set");
@@ -47,7 +49,7 @@ internal class EyeBot
             Console.WriteLine("ERROR - Could not add ICommand {0}", command.GetType().Name);
             throw new Exception();
         }
-        catch(HttpException exception)
+        catch (HttpException exception)
         {
             var json = JsonConvert.SerializeObject(exception.Errors, Formatting.Indented);
             Console.WriteLine(json);
@@ -57,17 +59,15 @@ internal class EyeBot
     private void InitCommands()
     {
         AddCommand(new RoleSelection()).Wait();
-        
+
+        foreach (var cmd in _commands.Values) ButtonHandlerEventHandler += cmd.ComponentHandle;
     }
 
     private Task SelectMenuHandler(SocketMessageComponent cmp)
     {
         try
         {
-            foreach (var cmd in _commands.Values)
-            {
-                if (cmd.ComponentHandle(_client, cmp)) break;
-            }
+            ButtonHandlerEventHandler.Invoke(_client, cmp);
         }
         catch (KeyNotFoundException)
         {
@@ -78,16 +78,13 @@ internal class EyeBot
 
         return Task.CompletedTask;
     }
-    
+
+
     private Task ButtonHandler(SocketMessageComponent cmp)
     {
         try
         {
-            foreach (var cmd in _commands.Values)
-            {
-                if (cmd.ComponentHandle(_client, cmp)) break;
-                
-            }
+            ButtonHandlerEventHandler.Invoke(_client, cmp);
         }
         catch (KeyNotFoundException)
         {
@@ -98,7 +95,7 @@ internal class EyeBot
 
         return Task.CompletedTask;
     }
-    
+
     private Task SlashCommandHandler(SocketSlashCommand command)
     {
         try
@@ -126,4 +123,6 @@ internal class EyeBot
         Console.WriteLine(msg.ToString());
         return Task.CompletedTask;
     }
+
+    private delegate void ButtonHandlerFuncSignature(DiscordSocketClient client, SocketMessageComponent cmp);
 }
