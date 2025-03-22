@@ -10,14 +10,17 @@ internal class EyeBot
 {
     private readonly DiscordSocketClient _client = new();
 
-    private readonly Dictionary<string, ICommand> _commands = new();
+    private readonly Dictionary<string, ICommand> _commands = [];
 
-    private event ButtonHandlerFuncSignature ButtonHandlerEventHandler = delegate { };
+    private event ButtonHandlerFuncSignature ButtonEventHandler = delegate { };
+
+    private event ModalHandlerFuncSignature ModalEventHandler = delegate { };
+
+    private event SelectMenuFuncSignature SelectMenuEventHandler = delegate { };
 
     private static void Main()
     {
-        var token = Environment.GetEnvironmentVariable("EYEBOT_TOKEN");
-        if (token == null) throw new NullReferenceException("EYEBOT_TOKEN environment variable is not set");
+        var token = Environment.GetEnvironmentVariable("EYEBOT_TOKEN") ?? throw new NullReferenceException("EYEBOT_TOKEN environment variable is not set");
         new EyeBot().MainAsync(token).GetAwaiter().GetResult();
     }
 
@@ -28,6 +31,7 @@ internal class EyeBot
         _client.SlashCommandExecuted += SlashCommandHandler;
         _client.SelectMenuExecuted += SelectMenuHandler;
         _client.ButtonExecuted += ButtonHandler;
+        _client.ModalSubmitted += ModalHandler;
 
         await _client.LoginAsync(TokenType.Bot, token);
         await _client.StartAsync();
@@ -59,57 +63,78 @@ internal class EyeBot
     private void InitCommands()
     {
         AddCommand(new RoleSelection()).Wait();
+        Console.WriteLine("Initializing commands...");
 
-        foreach (var cmd in _commands.Values) ButtonHandlerEventHandler += cmd.ComponentHandle;
+        foreach (var cmd in _commands.Values)
+        {
+
+            if (cmd is IModalCommand modalCmd)
+                ModalEventHandler += modalCmd.ModalHandler;
+            if (cmd is ISelectMenuCommand selectmenu)
+                SelectMenuEventHandler += selectmenu.SelectMenuHandle;
+            if (cmd is IButtonCommand button)
+                ButtonEventHandler += button.ButtonHandle;
+        }
     }
 
-    private Task SelectMenuHandler(SocketMessageComponent cmp)
+    private async Task ModalHandler(SocketModal cmp)
     {
         try
         {
-            ButtonHandlerEventHandler.Invoke(_client, cmp);
+            ModalEventHandler.Invoke(_client, cmp);
         }
         catch (KeyNotFoundException)
         {
             // "This interaction failed"
             // Not very ideal but idc
-            cmp.RespondAsync("", ephemeral: true);
+            await cmp.RespondAsync("This interaction failed", ephemeral: true);
         }
-
-        return Task.CompletedTask;
     }
 
-
-    private Task ButtonHandler(SocketMessageComponent cmp)
+    private async Task SelectMenuHandler(SocketMessageComponent cmp)
     {
         try
         {
-            ButtonHandlerEventHandler.Invoke(_client, cmp);
+            SelectMenuEventHandler.Invoke(_client, cmp);
         }
         catch (KeyNotFoundException)
         {
             // "This interaction failed"
             // Not very ideal but idc
-            cmp.RespondAsync("", ephemeral: true);
+            await cmp.RespondAsync("This interaction failed", ephemeral: true);
         }
+    }
 
-        return Task.CompletedTask;
+    private async Task ButtonHandler(SocketMessageComponent cmp)
+    {
+        try
+        {
+            ButtonEventHandler.Invoke(_client, cmp);
+        }
+        catch (KeyNotFoundException)
+        {
+            // "This interaction failed"
+            // Not very ideal but idc
+            await cmp.RespondAsync("This interaction failed", ephemeral: true);
+        }
     }
 
     private Task SlashCommandHandler(SocketSlashCommand command)
     {
         try
         {
-            _commands[command.CommandName].Execute(_client, command).Wait();
-        }
-        catch (KeyNotFoundException)
-        {
-            // "This interaction failed"
-            // Not very ideal but idc
-            command.RespondAsync("", ephemeral: true);
-        }
+            if (!_commands.TryGetValue(command.CommandName, out var cmd))
+            {
+                return command.RespondAsync("Unknown command.", ephemeral: true);
+            }
 
-        return Task.CompletedTask;
+            return cmd.Execute(_client, command);
+        }
+        catch (Exception error)
+        {
+            Console.WriteLine(error);
+            return Task.CompletedTask;
+        }
     }
 
     private Task Ready()
@@ -125,4 +150,8 @@ internal class EyeBot
     }
 
     private delegate void ButtonHandlerFuncSignature(DiscordSocketClient client, SocketMessageComponent cmp);
+    private delegate void ModalHandlerFuncSignature(DiscordSocketClient client, SocketModal modal);
+
+    private delegate void SelectMenuFuncSignature(DiscordSocketClient client, SocketMessageComponent cmp);
+
 }
